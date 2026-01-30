@@ -23,17 +23,39 @@ ecommerce_sales_forecast/
 ## 数据说明
 
 ### 模拟数据特征
-- 100个SKU，覆盖5个类目
-- 2年历史数据 (2024-01-01 ~ 2026-01-30)
-- 产品生命周期: 6-24个月
-- 每月有新品发布
-- 包含季节性、节假日、促销等影响因素
+- 800个SKU，6个产品线
+- 355,377行销量记录
+- 时间范围: 2024-01-01 ~ 2026-01-30
+- 年销售额: 约50亿人民币
+- 735个活跃SKU，65个已下架SKU
+
+### 产品线分布
+| 产品线 | SKU数量 | 占比 |
+|--------|---------|------|
+| led_strip | 280 | 35% |
+| smart_light | 200 | 25% |
+| tv_backlight | 120 | 15% |
+| outdoor_light | 80 | 10% |
+| smart_sensor | 64 | 8% |
+| accessory | 56 | 7% |
+
+### 站点分布
+| 站点 | SKU数量 | 占比 |
+|------|---------|------|
+| US | 435 | 54% |
+| DE | 118 | 15% |
+| UK | 97 | 12% |
+| FR | 54 | 7% |
+| CA | 38 | 5% |
+| ES | 34 | 4% |
+| IT | 24 | 3% |
 
 ### 数据字段
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | asin | str | Amazon 产品标识 |
 | sku | str | 内部SKU编号 |
+| marketplace | str | 站点 (US/UK/DE/FR/IT/ES/CA) |
 | date | datetime | 日期 |
 | sales_quantity | int | 销售数量 |
 | sale_price | float | 售价 |
@@ -45,7 +67,11 @@ ecommerce_sales_forecast/
 | fba_inventory | int | FBA库存 |
 | is_lightning_deal | int | 秒杀活动 |
 | is_coupon_active | int | 优惠券 |
-| category | str | 产品类目 |
+| is_deal_of_day | int | 每日特惠 |
+| bsr_rank | int | Best Seller 排名 |
+| rating | float | 评分 |
+| review_count | int | 评论数 |
+| product_line | str | 产品线 |
 | launch_date | datetime | 上架日期 |
 
 ## 核心特征
