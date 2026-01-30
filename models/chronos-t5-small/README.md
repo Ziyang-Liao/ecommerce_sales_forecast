@@ -1,58 +1,58 @@
-# Chronos-T5-Small 销量预测
+# Chronos-T5-Small Sales Forecasting
 
-基于 Amazon Chronos-T5-Small 预训练时序模型的销量预测方案。
+Sales forecasting solution based on Amazon Chronos-T5-Small pretrained time series model.
 
-## 模型信息
+## Model Information
 
-| 属性 | 值 |
-|------|-----|
-| 模型名称 | amazon/chronos-t5-small |
-| 参数量 | 46M |
-| 架构 | T5 Encoder-Decoder |
-| 特点 | 支持微调，采样式预测 |
+| Property | Value |
+|----------|-------|
+| Model Name | amazon/chronos-t5-small |
+| Parameters | 46M |
+| Architecture | T5 Encoder-Decoder |
+| Features | Supports fine-tuning, sampling-based prediction |
 
-## 性能测试结果
+## Performance Test Results
 
-### 模型对比 (60天预测, 100个SKU)
+### Model Comparison (60-day forecast, 100 SKUs)
 
-| 模型 | 准确率 | WAPE | 说明 |
-|------|--------|------|------|
-| chronos-2-small (预训练) | **92.2%** | 7.8% | ⭐ 推荐 |
-| **chronos-t5-small (微调后)** | **82.9%** | 17.1% | 本模型 |
-| chronos-t5-small (预训练) | 55.7% | 44.3% | 微调前 |
+| Model | Accuracy | WAPE | Notes |
+|-------|----------|------|-------|
+| chronos-2-small (pretrained) | **92.2%** | 7.8% | ⭐ Recommended |
+| **chronos-t5-small (fine-tuned)** | **82.9%** | 17.1% | This model |
+| chronos-t5-small (pretrained) | 55.7% | 44.3% | Before fine-tuning |
 
-### 微调效果
+### Fine-tuning Effect
 
-| 状态 | 准确率 | 提升 |
-|------|--------|------|
-| 预训练 | 55.7% | - |
-| 微调1000步 | 82.9% | +27.2% |
+| Status | Accuracy | Improvement |
+|--------|----------|-------------|
+| Pretrained | 55.7% | - |
+| Fine-tuned 1000 steps | 82.9% | +27.2% |
 
-**结论：T5-Small 需要微调才能达到较好效果，但仍不如 Chronos-2-Small 预训练模型。**
+**Conclusion: T5-Small requires fine-tuning for good results, but still underperforms Chronos-2-Small pretrained model.**
 
-## 与 Chronos-2-Small 对比
+## Comparison with Chronos-2-Small
 
-| 对比项 | Chronos-T5-Small | Chronos-2-Small |
+| Aspect | Chronos-T5-Small | Chronos-2-Small |
 |--------|------------------|-----------------|
-| 预训练准确率 | 55.7% | **92.2%** |
-| 微调后准确率 | 82.9% | 88.8% (反而下降) |
-| 是否需要微调 | ✅ 需要 | ❌ 不需要 |
-| 微调时间 | ~10分钟 | - |
-| 推荐程度 | 备选 | ⭐ 首选 |
+| Pretrained accuracy | 55.7% | **92.2%** |
+| Fine-tuned accuracy | 82.9% | 88.8% (decreases) |
+| Fine-tuning needed | ✅ Yes | ❌ No |
+| Fine-tuning time | ~10 minutes | - |
+| Recommendation | Alternative | ⭐ Primary choice |
 
-**建议：优先使用 Chronos-2-Small 预训练模型，无需微调即可达到 92.2% 准确率。**
+**Recommendation: Use Chronos-2-Small pretrained model first - achieves 92.2% accuracy without fine-tuning.**
 
-## 环境要求
+## Requirements
 
 ```bash
 pip install chronos-forecasting torch pandas numpy gluonts
 ```
 
-## 使用方法
+## Usage
 
-### 1. 准备训练数据
+### 1. Prepare Training Data
 
-首先需要将数据转换为 Arrow 格式：
+Convert data to Arrow format:
 
 ```python
 import pandas as pd
@@ -60,7 +60,7 @@ from gluonts.dataset.arrow import ArrowWriter
 
 df = pd.read_csv('data/sales_history.csv', parse_dates=['date'])
 
-# 转换为GluonTS格式
+# Convert to GluonTS format
 data = []
 for sku in df['sku'].unique():
     sku_data = df[df['sku'] == sku].sort_values('date')
@@ -69,17 +69,17 @@ for sku in df['sku'].unique():
         'target': sku_data['sales_quantity'].values.tolist()
     })
 
-# 保存为Arrow格式
+# Save as Arrow format
 ArrowWriter(compression='lz4').write_to_file(data, 'train_data/sales.arrow')
 ```
 
-### 2. 模型微调
+### 2. Fine-tune Model
 
 ```bash
 python finetune_chronos.py
 ```
 
-配置文件 `finetune_config.yaml`:
+Configuration file `finetune_config.yaml`:
 ```yaml
 training_data_paths:
   - "train_data/sales.arrow"
@@ -93,71 +93,71 @@ model_type: seq2seq
 random_init: false
 ```
 
-### 3. 评估微调模型
+### 3. Evaluate Fine-tuned Model
 
 ```bash
 python eval_finetuned.py
 ```
 
-## 代码示例
+## Code Example
 
-### 使用预训练模型预测
+### Prediction with Pretrained Model
 
 ```python
 import torch
 from chronos import ChronosPipeline
 
-# 加载模型
+# Load model
 pipe = ChronosPipeline.from_pretrained(
     "amazon/chronos-t5-small",
     device_map="cuda",
     dtype=torch.float32
 )
 
-# 预测
+# Predict
 history = torch.tensor([100, 120, 115, 130, ...], dtype=torch.float32)
 forecast = pipe.predict(history, prediction_length=60, num_samples=20)
 
-# 获取中位数
+# Get median
 # forecast shape: (batch, num_samples, pred_len)
 median = forecast.median(dim=1).values
-print(f"预测总量: {median.sum():.0f}")
+print(f"Forecast total: {median.sum():.0f}")
 ```
 
-### 使用微调模型预测
+### Prediction with Fine-tuned Model
 
 ```python
-# 加载微调后的模型
+# Load fine-tuned model
 pipe = ChronosPipeline.from_pretrained(
     "chronos_finetuned/checkpoint-1000",
     device_map="cuda",
     dtype=torch.float32
 )
 
-# 预测方式相同
+# Same prediction method
 forecast = pipe.predict(history, prediction_length=60, num_samples=20)
 ```
 
-## 微调参数说明
+## Fine-tuning Parameters
 
-| 参数 | 推荐值 | 说明 |
-|------|--------|------|
-| context_length | 512 | 上下文长度 |
-| prediction_length | 64 | 预测长度 |
-| max_steps | 1000 | 训练步数 |
-| learning_rate | 1e-4 | 学习率 |
-| batch_size | 4 | 批次大小 |
-| gradient_accumulation | 2 | 梯度累积 |
+| Parameter | Recommended | Description |
+|-----------|-------------|-------------|
+| context_length | 512 | Context length |
+| prediction_length | 64 | Prediction length |
+| max_steps | 1000 | Training steps |
+| learning_rate | 1e-4 | Learning rate |
+| batch_size | 4 | Batch size |
+| gradient_accumulation | 2 | Gradient accumulation |
 
-## 注意事项
+## Notes
 
-1. **必须微调**: 预训练模型准确率仅55.7%，需要微调才能使用
-2. **数据格式**: 需要转换为Arrow格式
-3. **训练时间**: 1000步约需10分钟 (GPU)
-4. **显存需求**: 约4GB
+1. **Fine-tuning required**: Pretrained accuracy only 55.7%, must fine-tune
+2. **Data format**: Requires Arrow format conversion
+3. **Training time**: ~10 minutes for 1000 steps (GPU)
+4. **VRAM requirement**: ~4GB
 
-## 参考资料
+## References
 
-- [Chronos 论文](https://arxiv.org/abs/2403.07815)
-- [HuggingFace 模型页](https://huggingface.co/amazon/chronos-t5-small)
-- [训练脚本文档](https://github.com/amazon-science/chronos-forecasting/tree/main/scripts/training)
+- [Chronos Paper](https://arxiv.org/abs/2403.07815)
+- [HuggingFace Model Page](https://huggingface.co/amazon/chronos-t5-small)
+- [Training Script Documentation](https://github.com/amazon-science/chronos-forecasting/tree/main/scripts/training)
