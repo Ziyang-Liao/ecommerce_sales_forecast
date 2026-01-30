@@ -1,23 +1,61 @@
-# 模型文件
-*_finetuned/
-*.pt
-*.bin
-*.safetensors
-
-# 数据文件
-*.csv
-!data/*.csv
-
-# 训练数据
-train_data/
-*.arrow
-
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Jupyter Notebook
 .ipynb_checkpoints/
 
-# 系统
-.DS_Store
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Model checkpoints (large files)
+*.safetensors
+*.bin
+*.pt
+*.pth
+finetuned-ckpt/
+chronos_finetuned/
+ft_*/
+
+# Data (keep structure, ignore large files)
+*.arrow
+*.parquet
+
+# Logs
 *.log
-data/sales_history_enriched.csv
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.pem

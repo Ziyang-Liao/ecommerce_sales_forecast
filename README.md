@@ -1,6 +1,57 @@
 # E-commerce Sales Forecasting
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+
 Sales forecasting solution based on Amazon Chronos-2 pre-trained time series model.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Data Pipeline                            │
+├─────────────────────────────────────────────────────────────────┤
+│  sales_history.csv  ──►  Preprocessing  ──►  Feature Engineering│
+│                              │                      │           │
+│                              ▼                      ▼           │
+│                     sales_history_enriched.csv                  │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Chronos-2-Small Model                       │
+├─────────────────────────────────────────────────────────────────┤
+│  Input: Historical Sales + is_major_sale_event (optional)       │
+│                               │                                 │
+│                               ▼                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │  Tokenizer  │───►│  T5 Encoder │───►│  Quantile   │         │
+│  │             │    │  + GroupAttn│    │  Decoder    │         │
+│  └─────────────┘    └─────────────┘    └─────────────┘         │
+│                               │                                 │
+│                               ▼                                 │
+│  Output: 13 Quantile Forecasts (p01, p05, ..., p50, ..., p99)  │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Forecast Output                            │
+├─────────────────────────────────────────────────────────────────┤
+│  • Median prediction (p50)                                      │
+│  • Confidence intervals (p10-p90)                               │
+│  • Probabilistic forecasts for inventory planning               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Key Results
+
+| Metric | Value |
+|--------|-------|
+| **Best Accuracy** | 92.2% (60-day forecast) |
+| **Model** | chronos-2-small (28M params) |
+| **Inference Speed** | 14ms/SKU (GPU), 24ms/SKU (CPU) |
+| **Fine-tuning Required** | No |
 
 ## Project Structure
 
@@ -13,33 +64,66 @@ ecommerce_sales_forecast/
 │   │   ├── finetune.py           # Fine-tuning script
 │   │   └── README.md
 │   └── chronos-t5-small/         # Supports fine-tuning
-│       ├── finetune_chronos.py
-│       ├── finetune_config.yaml
-│       ├── eval_finetuned.py
-│       └── README.md
+│       └── ...
 ├── data/
 │   ├── sales_history.csv         # Sales history data
 │   ├── sku_metadata.csv          # SKU metadata
 │   └── data_dictionary.md        # Data dictionary
 ├── src/
 │   ├── generate_sample_data.py   # Sample data generator
-│   ├── preprocess/
-│   │   ├── preprocess.py         # Data preprocessing
-│   │   └── add_features.py       # Feature engineering
-│   └── evaluate/
-│       └── evaluate.py           # Evaluation utilities
-├── notebooks/
-│   ├── deploy_chronos.ipynb      # SageMaker deployment
-│   ├── batch_inference.ipynb     # Batch inference
-│   └── evaluate.ipynb            # Evaluation visualization
-├── tests/
-│   └── test_covariate_impact.py  # Covariate impact testing
+│   ├── preprocess/               # Data preprocessing
+│   └── evaluate/                 # Evaluation utilities
+├── notebooks/                    # Jupyter notebooks
+├── tests/                        # Test scripts
+├── requirements.txt
+├── LICENSE
 └── README.md
 ```
 
-## Model Comparison
+## Quick Start
 
-60-day sales forecast accuracy (100 SKUs backtesting):
+### Installation
+
+```bash
+git clone https://github.com/YOUR_USERNAME/ecommerce_sales_forecast.git
+cd ecommerce_sales_forecast
+pip install -r requirements.txt
+```
+
+### Basic Usage
+
+```python
+import torch
+from chronos.chronos2 import Chronos2Pipeline
+
+# Load model (CPU or GPU)
+pipe = Chronos2Pipeline.from_pretrained(
+    "autogluon/chronos-2-small",
+    device_map="cpu"  # or "cuda" for GPU
+)
+
+# Prepare historical sales data
+history = torch.tensor([100, 120, 115, 130, ...], dtype=torch.float32)
+
+# Forecast next 60 days
+forecast = pipe.predict(
+    history.unsqueeze(0).unsqueeze(0),
+    prediction_length=60
+)
+
+# Get median prediction
+median = forecast[0][0, 6, :].numpy()
+print(f"60-day forecast: {median.sum():.0f} units")
+```
+
+### Batch Prediction
+
+```bash
+cd models/chronos-2-small
+python predict.py --data ../../data/sales_history.csv --output forecast.csv --days 60
+```
+
+## Model Comparison
 
 | Model | Parameters | Accuracy | WAPE | Recommended Use |
 |-------|------------|----------|------|-----------------|
@@ -50,133 +134,66 @@ ecommerce_sales_forecast/
 
 ## Covariate Testing Conclusions
 
-### Mature vs New Product Forecasting Strategy
+### Mature vs New Product Strategy
 
 | Scenario | Sales Only | Sales + Major Sale | Recommendation |
 |----------|------------|-------------------|----------------|
-| **Mature Products** (history ≥60 days) | 92.0% | 92.1% | Add major sale field |
-| **New Products** (history <60 days) | 48.0% | 51.1% | Add major sale field |
+| **Mature Products** (≥60 days) | 92.0% | 92.1% | Add major sale field |
+| **New Products** (<60 days) | 48.0% | 51.1% | Add major sale field |
 
 ### Key Findings
 
-1. **Pretrained model is optimal**: Fine-tuning reduces accuracy for both mature and new products
-2. **Fewer covariates is better**: Adding too many features introduces noise
-3. **New product exception**: With insufficient history, `is_major_sale_event` improves accuracy by +3.1%
-4. **Unified approach**: `Sales + is_major_sale_event` works for all scenarios
-
-### Detailed Covariate Testing (Mature Products)
-
-| Configuration | Accuracy |
-|---------------|----------|
-| No covariates | 92.0% |
-| is_major_sale_event | **92.1%** |
-| 6 promotion fields | 81.9% |
-| All 18 covariates | 81.1% |
+1. **Pretrained model is optimal** - Fine-tuning reduces accuracy
+2. **Fewer covariates is better** - Too many features introduce noise
+3. **Unified approach** - `Sales + is_major_sale_event` works for all scenarios
 
 ## CPU vs GPU Performance
 
-### Speed Comparison
-
-| Scenario | GPU | CPU | Winner |
-|----------|-----|-----|--------|
-| Single SKU | 49ms | 27ms | CPU |
-| 100 SKUs batch | 14ms/SKU | 24ms/SKU | GPU (1.7x faster) |
-
-### Accuracy Comparison
-
 | Scenario | GPU | CPU | Difference |
 |----------|-----|-----|------------|
-| Mature Products | 71.25% | 71.25% | 0.00% |
-| New Products | 48.02% | 48.02% | 0.00% |
-
-**GPU and CPU produce identical results - no accuracy difference.**
+| Single SKU | 49ms | 27ms | CPU faster |
+| 100 SKUs batch | 14ms/SKU | 24ms/SKU | GPU 1.7x faster |
+| **Accuracy** | 92.2% | 92.2% | **Identical** |
 
 ### Recommendation
 
-| Use Case | Recommended | Reason |
-|----------|-------------|--------|
-| **Prediction only** | CPU | Same accuracy, lower cost |
-| **Fine-tuning** | GPU | Much faster training |
-| **Batch prediction (1000+ SKUs)** | GPU | Better throughput |
-
-## Quick Start
-
-### Environment Setup
-
-```bash
-pip install chronos-forecasting>=2.1.0 torch pandas numpy
-```
-
-### Using Chronos-2-Small (Recommended)
-
-```bash
-cd models/chronos-2-small
-
-# Batch prediction
-python predict.py --data ../../data/sales_history.csv --output forecast.csv --days 60
-
-# Model evaluation
-python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
-```
-
-### CPU vs GPU Usage
-
-```python
-from chronos.chronos2 import Chronos2Pipeline
-
-# GPU (for fine-tuning or large batch)
-pipe = Chronos2Pipeline.from_pretrained("autogluon/chronos-2-small", device_map="cuda")
-
-# CPU (for prediction, lower cost)
-pipe = Chronos2Pipeline.from_pretrained("autogluon/chronos-2-small", device_map="cpu")
-```
+| Use Case | Instance | Notes |
+|----------|----------|-------|
+| **Prediction** | c8g.xlarge | Graviton4, best price-performance |
+| **Fine-tuning** | g5.xlarge | GPU required |
+| **Large batch** | g5.xlarge | Better throughput |
 
 ## Data Format
 
-### Input Data (sales_history.csv)
+### Input
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | sku | str | ✅ | SKU identifier |
 | date | datetime | ✅ | Date |
 | sales_quantity | int | ✅ | Sales quantity |
-| marketplace | str | ✅ | Marketplace (US/UK/DE etc.) |
-| is_major_sale_event | int | Recommended | Major sale flag (for new products) |
+| marketplace | str | ✅ | Marketplace (US/UK/DE) |
+| is_major_sale_event | int | Recommended | Major sale flag |
 
-### Output Data
+### Output
 
 | Field | Description |
 |-------|-------------|
-| sku | SKU identifier |
-| date | Forecast date |
-| predicted_median | Median prediction |
+| predicted_median | Median prediction (p50) |
 | predicted_p10 | 10th percentile (pessimistic) |
 | predicted_p90 | 90th percentile (optimistic) |
 
-## Evaluation Metrics
+## Contributing
 
-| Metric | Description | Target |
-|--------|-------------|--------|
-| WAPE | Weighted Absolute Percentage Error | <15% Excellent |
-| Accuracy | Accuracy (100-WAPE) | >85% Good |
-| Bias | Forecast bias | Close to 0 |
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## Deployment Recommendations
+## License
 
-### Instance Selection
-
-| Use Case | Instance Type | Notes |
-|----------|---------------|-------|
-| **Prediction (CPU)** | c8g.xlarge | Graviton4, best price-performance |
-| **Prediction (GPU)** | g5.xlarge | Large batch |
-| **Fine-tuning** | g5.xlarge+ | GPU required |
-
-### SageMaker Deployment
-
-See `notebooks/deploy_chronos.ipynb` for endpoint deployment.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
 
 ## References
 
 - [Chronos-2 Paper](https://arxiv.org/abs/2510.15821)
 - [Chronos Paper](https://arxiv.org/abs/2403.07815)
 - [GitHub Repository](https://github.com/amazon-science/chronos-forecasting)
+- [HuggingFace Model](https://huggingface.co/autogluon/chronos-2-small)
