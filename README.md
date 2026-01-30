@@ -73,6 +73,32 @@ ecommerce_sales_forecast/
 | 6 promotion fields | 81.9% |
 | All 18 covariates | 81.1% |
 
+## CPU vs GPU Performance
+
+### Speed Comparison
+
+| Scenario | GPU | CPU | Winner |
+|----------|-----|-----|--------|
+| Single SKU | 49ms | 27ms | CPU |
+| 100 SKUs batch | 14ms/SKU | 24ms/SKU | GPU (1.7x faster) |
+
+### Accuracy Comparison
+
+| Scenario | GPU | CPU | Difference |
+|----------|-----|-----|------------|
+| Mature Products | 71.25% | 71.25% | 0.00% |
+| New Products | 48.02% | 48.02% | 0.00% |
+
+**GPU and CPU produce identical results - no accuracy difference.**
+
+### Recommendation
+
+| Use Case | Recommended | Reason |
+|----------|-------------|--------|
+| **Prediction only** | CPU | Same accuracy, lower cost |
+| **Fine-tuning** | GPU | Much faster training |
+| **Batch prediction (1000+ SKUs)** | GPU | Better throughput |
+
 ## Quick Start
 
 ### Environment Setup
@@ -91,6 +117,18 @@ python predict.py --data ../../data/sales_history.csv --output forecast.csv --da
 
 # Model evaluation
 python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
+```
+
+### CPU vs GPU Usage
+
+```python
+from chronos.chronos2 import Chronos2Pipeline
+
+# GPU (for fine-tuning or large batch)
+pipe = Chronos2Pipeline.from_pretrained("autogluon/chronos-2-small", device_map="cuda")
+
+# CPU (for prediction, lower cost)
+pipe = Chronos2Pipeline.from_pretrained("autogluon/chronos-2-small", device_map="cpu")
 ```
 
 ## Data Format
@@ -125,13 +163,13 @@ python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
 
 ## Deployment Recommendations
 
-### EC2 Instance Selection
+### Instance Selection
 
 | Use Case | Instance Type | Notes |
 |----------|---------------|-------|
-| Development | g5.xlarge | 24GB VRAM |
-| Production | g5.2xlarge | Batch prediction |
-| Large scale | g6e.xlarge | L40S GPU |
+| **Prediction (CPU)** | c5.xlarge | Cost-effective |
+| **Prediction (GPU)** | g5.xlarge | Large batch |
+| **Fine-tuning** | g5.xlarge+ | GPU required |
 
 ### SageMaker Deployment
 
