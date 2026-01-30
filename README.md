@@ -1,161 +1,131 @@
 # 跨境电商销量预测
 
-基于 Amazon Chronos-2 预训练时序模型的销量预测方案，部署在 SageMaker 上。
+基于 Amazon Chronos 预训练时序模型的销量预测方案。
 
 ## 项目结构
 
 ```
 ecommerce_sales_forecast/
+├── models/
+│   ├── chronos-2-small/      # 推荐：Chronos-2-Small模型 (准确率最高)
+│   │   ├── predict.py        # 预测脚本
+│   │   ├── finetune.py       # 微调脚本
+│   │   ├── evaluate.py       # 评估脚本
+│   │   └── README.md         # 使用说明
+│   └── chronos-t5-small/     # Chronos-T5-Small模型 (支持微调)
+│       ├── finetune_chronos.py
+│       ├── finetune_config.yaml
+│       ├── eval_finetuned.py
+│       └── README.md
 ├── data/
-│   ├── sales_history.csv   # 销量历史数据 (34,858行)
-│   └── sku_metadata.csv    # SKU元数据 (100个SKU)
-├── code_preprocess/
-│   └── preprocess.py       # 数据预处理与特征工程
-├── code_evaluate/
-│   └── evaluate.py         # 评估指标计算
-├── generate_sample_data.py # 模拟数据生成器
-├── deploy_chronos.ipynb    # 实时端点部署与预测
-├── batch_inference.ipynb   # 多站点批量预测
-├── evaluate.ipynb          # 模型评估与可视化
+│   ├── sales_history.csv     # 销量历史数据
+│   └── sku_metadata.csv      # SKU元数据
+├── code_preprocess/          # 数据预处理
+├── code_evaluate/            # 评估工具
 └── README.md
 ```
 
-## 数据说明
+## 模型对比
 
-### 模拟数据特征
-- 800个SKU，6个产品线
-- 355,377行销量记录
-- 时间范围: 2024-01-01 ~ 2026-01-30
-- 年销售额: 约50亿人民币
-- 735个活跃SKU，65个已下架SKU
+60天销量预测准确率 (100个SKU回测):
 
-### 产品线分布
-| 产品线 | SKU数量 | 占比 |
-|--------|---------|------|
-| led_strip | 280 | 35% |
-| smart_light | 200 | 25% |
-| tv_backlight | 120 | 15% |
-| outdoor_light | 80 | 10% |
-| smart_sensor | 64 | 8% |
-| accessory | 56 | 7% |
+| 模型 | 参数量 | 准确率 | WAPE | 推荐场景 |
+|------|--------|--------|------|----------|
+| **chronos-2-small** | 28M | **92.2%** | 7.8% | ⭐ 生产环境首选 |
+| chronos-t5-small (微调) | 46M | 82.9% | 17.1% | 需要定制化 |
+| chronos-t5-small (预训练) | 46M | 55.7% | 44.3% | 快速验证 |
+| chronos-bolt-small | 48M | 70.7% | 29.3% | 追求速度 |
 
-### 站点分布
-| 站点 | SKU数量 | 占比 |
-|------|---------|------|
-| US | 435 | 54% |
-| DE | 118 | 15% |
-| UK | 97 | 12% |
-| FR | 54 | 7% |
-| CA | 38 | 5% |
-| ES | 34 | 4% |
-| IT | 24 | 3% |
+## 快速开始
 
-### 数据字段
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| asin | str | Amazon 产品标识 |
-| sku | str | 内部SKU编号 |
-| marketplace | str | 站点 (US/UK/DE/FR/IT/ES/CA) |
-| date | datetime | 日期 |
-| sales_quantity | int | 销售数量 |
-| sale_price | float | 售价 |
-| original_price | float | 原价 |
-| discount_rate | float | 折扣率 |
-| ad_spend | float | 广告花费 |
-| ad_impressions | int | 广告曝光 |
-| ad_clicks | int | 广告点击 |
-| fba_inventory | int | FBA库存 |
-| is_lightning_deal | int | 秒杀活动 |
-| is_coupon_active | int | 优惠券 |
-| is_deal_of_day | int | 每日特惠 |
-| bsr_rank | int | Best Seller 排名 |
-| rating | float | 评分 |
-| review_count | int | 评论数 |
-| product_line | str | 产品线 |
-| launch_date | datetime | 上架日期 |
+### 环境准备
 
-## 核心特征
-
-### 节假日特征（影响最大）
-| 特征 | 说明 | 影响程度 |
-|------|------|----------|
-| is_halloween_season | 万圣节季 (10月) | ⭐⭐⭐⭐⭐ |
-| is_christmas_season | 圣诞季 (11.15-12.25) | ⭐⭐⭐⭐⭐ |
-| is_black_friday_week | 黑五周 | ⭐⭐⭐⭐⭐ |
-| is_prime_day | Prime Day | ⭐⭐⭐⭐ |
-| is_back_to_school | 返校季 | ⭐⭐⭐ |
-
-### 促销/广告特征
-- discount_rate: 折扣率
-- has_promotion: 是否有促销
-- ad_spend: 广告花费
-- has_advertising: 是否投放广告
-
-### 产品生命周期
-- days_since_launch: 上架天数
-- is_new_product: 是否新品 (<60天)
-
-## 使用方法
-
-### 1. 实时预测 (单站点)
 ```bash
-jupyter notebook deploy_chronos.ipynb
+# Python 3.10+
+pip install chronos-forecasting>=2.1.0 torch pandas numpy
+
+# GPU支持 (推荐)
+# 需要CUDA 11.8+
 ```
 
-### 2. 批量预测 (多站点)
+### 使用Chronos-2-Small预测 (推荐)
+
 ```bash
-jupyter notebook batch_inference.ipynb
+cd models/chronos-2-small
+
+# 批量预测
+python predict.py --data ../../data/sales_history.csv --output forecast.csv --days 60
+
+# 模型评估
+python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
 ```
 
-## 数据要求
+### 使用Chronos-T5-Small (需微调)
+
+```bash
+cd models/chronos-t5-small
+
+# 微调模型
+python finetune_chronos.py
+
+# 评估
+python eval_finetuned.py
+```
+
+## 数据格式
+
+### 输入数据 (sales_history.csv)
 
 | 字段 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| asin | str | ✅ | Amazon 产品标识 |
+| sku | str | ✅ | SKU编号 |
 | date | datetime | ✅ | 日期 |
 | sales_quantity | int | ✅ | 销售数量 |
-| sale_price | float | 建议 | 售价 |
-| original_price | float | 建议 | 原价 |
-| ad_spend | float | 建议 | 广告花费 |
-| fba_inventory | int | 建议 | FBA 库存 |
-| is_lightning_deal | int | 可选 | 秒杀活动 |
-| is_coupon_active | int | 可选 | 优惠券 |
-| launch_date | datetime | 可选 | 上架日期 |
+| marketplace | str | ✅ | 站点 (US/UK/DE等) |
 
-## SageMaker 部署选项
+### 输出数据
 
-| 模式 | 实例 | 适用场景 |
-|------|------|----------|
-| 实时端点 (GPU) | ml.g5.xlarge | 低延迟，高吞吐 |
-| 实时端点 (CPU) | ml.c5.xlarge | 成本敏感 |
-| Batch Transform | ml.c5.4xlarge | 大规模批量预测 |
+| 字段 | 说明 |
+|------|------|
+| sku | SKU编号 |
+| date | 预测日期 |
+| predicted_median | 中位数预测 |
+| predicted_p10 | 10%分位数 (悲观) |
+| predicted_p90 | 90%分位数 (乐观) |
 
-## 预测周期建议
-
-- 日常运营: 每日预测未来 14 天
-- 备货计划: 每周预测未来 28 天
-- 旺季前: 提前 60 天预测 Q4 销量
-
-## 评估指标说明
+## 评估指标
 
 | 指标 | 说明 | 建议阈值 |
 |------|------|----------|
-| MAE | 平均绝对误差 | 越小越好 |
-| RMSE | 均方根误差 (对大误差敏感) | 越小越好 |
-| MAPE | 平均绝对百分比误差 | <20% 良好 |
-| WAPE | 加权绝对百分比误差 (推荐) | <15% 优秀 |
-| Bias | 预测偏差 (正=高估, 负=低估) | 接近0 |
-| QL | 分位数损失 | 越小越好 |
+| WAPE | 加权绝对百分比误差 | <15% 优秀 |
+| Accuracy | 准确率 (100-WAPE) | >85% 良好 |
+| Bias | 预测偏差 | 接近0 |
 
-### 为什么推荐 WAPE？
-- MAPE 对低销量产品误差放大
-- WAPE 按销量加权，更符合业务实际
-- 公式: WAPE = Σ|实际-预测| / Σ|实际|
+## 部署建议
 
-## 业务影响分析
+### EC2实例选择
 
-评估模块包含业务影响计算：
-- **高估** → 库存积压成本
-- **低估** → 缺货损失
+| 场景 | 实例类型 | 说明 |
+|------|----------|------|
+| 开发测试 | g5.xlarge | 24GB显存，性价比高 |
+| 生产环境 | g5.2xlarge | 更大内存，批量预测 |
+| 大规模 | g6e.xlarge | L40S GPU，最新架构 |
 
-帮助量化预测误差的实际业务成本。
+### SageMaker部署
+
+参考 `deploy_chronos.ipynb` 进行SageMaker端点部署。
+
+## 预测周期建议
+
+| 场景 | 预测周期 | 更新频率 |
+|------|----------|----------|
+| 日常运营 | 14天 | 每日 |
+| 备货计划 | 28天 | 每周 |
+| 旺季规划 | 60天 | 每月 |
+
+## 参考资料
+
+- [Chronos-2 论文](https://arxiv.org/abs/2510.15821)
+- [Chronos 论文](https://arxiv.org/abs/2403.07815)
+- [GitHub 仓库](https://github.com/amazon-science/chronos-forecasting)
+- [HuggingFace 模型](https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444)
