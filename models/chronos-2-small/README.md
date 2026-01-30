@@ -13,6 +13,97 @@
 | 输出分位数 | 13个 (0.01~0.99) |
 | 特点 | 支持单变量/多变量/协变量预测 |
 
+## 数据维度说明
+
+### 核心字段 (必需)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| sku | str | ⭐⭐⭐⭐⭐ | SKU编号 | 唯一标识每个产品，用于分组预测 |
+| date | datetime | ⭐⭐⭐⭐⭐ | 日期 | 时间序列的时间维度，必须连续 |
+| sales_quantity | int | ⭐⭐⭐⭐⭐ | 销售数量 | **预测目标**，模型的核心输入 |
+| marketplace | str | ⭐⭐⭐⭐ | 站点 | 不同站点销售模式不同，需分开预测 |
+
+### 价格相关 (强烈建议)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| sale_price | float | ⭐⭐⭐⭐ | 售价 | 价格变动直接影响销量，可作为协变量 |
+| original_price | float | ⭐⭐⭐ | 原价 | 用于计算折扣力度 |
+| discount_rate | float | ⭐⭐⭐⭐ | 折扣率 | 促销力度的量化指标，影响销量波动 |
+
+### 广告相关 (建议)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| ad_spend | float | ⭐⭐⭐⭐ | 广告花费 | 广告投入与销量强相关 |
+| ad_impressions | int | ⭐⭐⭐ | 广告曝光 | 反映产品曝光度 |
+| ad_clicks | int | ⭐⭐⭐ | 广告点击 | 反映用户兴趣度 |
+
+### 促销活动 (建议)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| is_lightning_deal | int | ⭐⭐⭐⭐ | 秒杀活动 | 秒杀期间销量会大幅波动 |
+| is_coupon_active | int | ⭐⭐⭐ | 优惠券 | 优惠券影响转化率 |
+| is_deal_of_day | int | ⭐⭐⭐ | 每日特惠 | 特惠活动影响销量 |
+
+### 库存相关 (建议)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| fba_inventory | int | ⭐⭐⭐⭐ | FBA库存 | 缺货会导致销量为0，需要识别 |
+
+### 产品表现 (可选)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| bsr_rank | int | ⭐⭐⭐ | BSR排名 | 反映产品竞争力变化 |
+| rating | float | ⭐⭐ | 评分 | 评分影响转化率 |
+| review_count | int | ⭐⭐ | 评论数 | 评论数影响购买决策 |
+
+### 产品属性 (可选)
+
+| 字段 | 类型 | 重要程度 | 说明 | 为什么需要 |
+|------|------|----------|------|------------|
+| asin | str | ⭐⭐ | Amazon产品ID | 产品唯一标识 |
+| product_line | str | ⭐⭐ | 产品线 | 不同产品线季节性不同 |
+| launch_date | datetime | ⭐⭐ | 上架日期 | 新品期销量模式特殊 |
+
+### 重要程度说明
+
+| 等级 | 含义 | 建议 |
+|------|------|------|
+| ⭐⭐⭐⭐⭐ | 必需 | 缺少则无法预测 |
+| ⭐⭐⭐⭐ | 强烈建议 | 显著提升预测准确率 |
+| ⭐⭐⭐ | 建议 | 有助于捕捉特殊事件 |
+| ⭐⭐ | 可选 | 锦上添花 |
+
+### 当前模型使用情况
+
+**Chronos-2-Small 当前仅使用 `sales_quantity` 作为输入**，属于单变量预测。
+
+未来可扩展为多变量预测，将价格、广告、促销等作为协变量输入，进一步提升准确率。
+
+```python
+# 当前使用方式 (单变量)
+history = df['sales_quantity'].values
+forecast = pipe.predict(history, prediction_length=60)
+
+# 未来可扩展 (多变量 + 协变量)
+task = {
+    'target': sales_quantity,  # 预测目标
+    'past_covariates': {       # 历史协变量
+        'price': price_history,
+        'ad_spend': ad_history,
+    },
+    'future_covariates': {     # 已知未来协变量
+        'price': planned_price,
+    }
+}
+forecast = pipe.predict([task], prediction_length=60)
+```
+
 ## 性能测试结果
 
 ### 模型对比 (60天预测, 100个SKU)
@@ -87,15 +178,6 @@ python predict.py --data ../../data/sales_history.csv --output forecast.csv --da
 python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30 --days 60
 ```
 
-参数说明:
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| --data | data/sales_history.csv | 销量历史数据路径 |
-| --model | None | 微调模型路径 (不指定则用预训练) |
-| --cutoff | 2025-11-30 | 回测截止日期 |
-| --days | 60 | 预测天数 |
-| --max-skus | 100 | 最大评估SKU数 |
-
 ### 3. 模型微调 (不推荐)
 
 ```bash
@@ -148,27 +230,6 @@ p90 = forecast[0][0, 10, :]  # 90%分位数 (乐观预测)
 print(f"悲观预测 (P10): {p10.sum():.0f}")
 print(f"中位数预测 (P50): {p50.sum():.0f}")
 print(f"乐观预测 (P90): {p90.sum():.0f}")
-```
-
-### 批量预测多个SKU
-
-```python
-import pandas as pd
-
-# 加载数据
-df = pd.read_csv('data/sales_history.csv', parse_dates=['date'])
-
-# 批量预测
-results = []
-for sku in df['sku'].unique():
-    history = df[df['sku'] == sku].sort_values('date')['sales_quantity'].values
-    if len(history) >= 60:
-        tensor = torch.tensor(history, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-        forecast = pipe.predict(tensor, prediction_length=60)
-        pred_total = forecast[0][0, 6, :].sum().item()
-        results.append({'sku': sku, 'predicted_60d': pred_total})
-
-result_df = pd.DataFrame(results)
 ```
 
 ## 输出格式
