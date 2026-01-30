@@ -7,21 +7,33 @@
 ```
 ecommerce_sales_forecast/
 ├── models/
-│   ├── chronos-2-small/      # 推荐：Chronos-2-Small模型 (准确率最高)
-│   │   ├── predict.py        # 预测脚本
-│   │   ├── finetune.py       # 微调脚本
-│   │   ├── evaluate.py       # 评估脚本
-│   │   └── README.md         # 使用说明
-│   └── chronos-t5-small/     # Chronos-T5-Small模型 (支持微调)
+│   ├── chronos-2-small/          # 推荐：准确率最高 (92.2%)
+│   │   ├── predict.py            # 预测脚本
+│   │   ├── evaluate.py           # 评估脚本
+│   │   ├── finetune.py           # 微调脚本
+│   │   └── README.md
+│   └── chronos-t5-small/         # 支持微调
 │       ├── finetune_chronos.py
 │       ├── finetune_config.yaml
 │       ├── eval_finetuned.py
 │       └── README.md
 ├── data/
-│   ├── sales_history.csv     # 销量历史数据
-│   └── sku_metadata.csv      # SKU元数据
-├── code_preprocess/          # 数据预处理
-├── code_evaluate/            # 评估工具
+│   ├── sales_history.csv         # 销量历史数据
+│   ├── sku_metadata.csv          # SKU元数据
+│   └── data_dictionary.md        # 数据字典
+├── src/
+│   ├── generate_sample_data.py   # 模拟数据生成
+│   ├── preprocess/
+│   │   ├── preprocess.py         # 数据预处理
+│   │   └── add_features.py       # 特征工程
+│   └── evaluate/
+│       └── evaluate.py           # 评估工具
+├── notebooks/
+│   ├── deploy_chronos.ipynb      # SageMaker部署
+│   ├── batch_inference.ipynb     # 批量推理
+│   └── evaluate.ipynb            # 评估可视化
+├── tests/
+│   └── test_covariate_impact.py  # 协变量测试
 └── README.md
 ```
 
@@ -41,11 +53,7 @@ ecommerce_sales_forecast/
 ### 环境准备
 
 ```bash
-# Python 3.10+
 pip install chronos-forecasting>=2.1.0 torch pandas numpy
-
-# GPU支持 (推荐)
-# 需要CUDA 11.8+
 ```
 
 ### 使用Chronos-2-Small预测 (推荐)
@@ -107,25 +115,16 @@ python eval_finetuned.py
 
 | 场景 | 实例类型 | 说明 |
 |------|----------|------|
-| 开发测试 | g5.xlarge | 24GB显存，性价比高 |
-| 生产环境 | g5.2xlarge | 更大内存，批量预测 |
-| 大规模 | g6e.xlarge | L40S GPU，最新架构 |
+| 开发测试 | g5.xlarge | 24GB显存 |
+| 生产环境 | g5.2xlarge | 批量预测 |
+| 大规模 | g6e.xlarge | L40S GPU |
 
 ### SageMaker部署
 
-参考 `deploy_chronos.ipynb` 进行SageMaker端点部署。
-
-## 预测周期建议
-
-| 场景 | 预测周期 | 更新频率 |
-|------|----------|----------|
-| 日常运营 | 14天 | 每日 |
-| 备货计划 | 28天 | 每周 |
-| 旺季规划 | 60天 | 每月 |
+参考 `notebooks/deploy_chronos.ipynb` 进行端点部署。
 
 ## 参考资料
 
 - [Chronos-2 论文](https://arxiv.org/abs/2510.15821)
 - [Chronos 论文](https://arxiv.org/abs/2403.07815)
 - [GitHub 仓库](https://github.com/amazon-science/chronos-forecasting)
-- [HuggingFace 模型](https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444)
