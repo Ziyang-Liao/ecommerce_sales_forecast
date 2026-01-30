@@ -1,0 +1,22 @@
+# 模型文件
+*_finetuned/
+*.pt
+*.bin
+*.safetensors
+
+# 数据文件
+*.csv
+!data/*.csv
+
+# 训练数据
+train_data/
+*.arrow
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 系统
+.DS_Store
+*.log
