@@ -1,6 +1,6 @@
 # 跨境电商销量预测
 
-基于 Amazon Chronos 预训练时序模型的销量预测方案。
+基于 Amazon Chronos-2 预训练时序模型的销量预测方案。
 
 ## 项目结构
 
@@ -48,6 +48,31 @@ ecommerce_sales_forecast/
 | chronos-t5-small (预训练) | 46M | 55.7% | 44.3% | 快速验证 |
 | chronos-bolt-small | 48M | 70.7% | 29.3% | 追求速度 |
 
+## 协变量测试结论
+
+### 老品 vs 新品预测策略
+
+| 场景 | 仅销量 | 销量+大促 | 建议 |
+|------|--------|-----------|------|
+| **老品** (历史≥60天) | 92.0% | 92.1% | 仅销量即可 |
+| **新品** (历史<60天) | 48.0% | 51.1% | 加大促字段 |
+
+### 关键发现
+
+1. **预训练模型最优**：微调会降低准确率，无论老品还是新品
+2. **协变量越少越好**：添加过多特征会引入噪声
+3. **新品场景例外**：历史数据不足时，`is_major_sale_event` 可提升 +3.1%
+4. **统一方案**：`销量 + is_major_sale_event` 适用于所有场景
+
+### 协变量详细测试 (老品)
+
+| 配置 | 准确率 |
+|------|--------|
+| 无协变量 | 92.0% |
+| is_major_sale_event | **92.1%** |
+| 6个促销字段 | 81.9% |
+| 全部18个协变量 | 81.1% |
+
 ## 快速开始
 
 ### 环境准备
@@ -68,18 +93,6 @@ python predict.py --data ../../data/sales_history.csv --output forecast.csv --da
 python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
 ```
 
-### 使用Chronos-T5-Small (需微调)
-
-```bash
-cd models/chronos-t5-small
-
-# 微调模型
-python finetune_chronos.py
-
-# 评估
-python eval_finetuned.py
-```
-
 ## 数据格式
 
 ### 输入数据 (sales_history.csv)
@@ -90,6 +103,7 @@ python eval_finetuned.py
 | date | datetime | ✅ | 日期 |
 | sales_quantity | int | ✅ | 销售数量 |
 | marketplace | str | ✅ | 站点 (US/UK/DE等) |
+| is_major_sale_event | int | 建议 | 大促标记 (新品场景) |
 
 ### 输出数据
 
