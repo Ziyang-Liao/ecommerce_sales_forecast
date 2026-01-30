@@ -167,7 +167,7 @@ pipe = Chronos2Pipeline.from_pretrained("autogluon/chronos-2-small", device_map=
 
 | Use Case | Instance Type | Notes |
 |----------|---------------|-------|
-| **Prediction (CPU)** | c5.xlarge | Cost-effective |
+| **Prediction (CPU)** | c8g.xlarge | Graviton4, best price-performance |
 | **Prediction (GPU)** | g5.xlarge | Large batch |
 | **Fine-tuning** | g5.xlarge+ | GPU required |
 
