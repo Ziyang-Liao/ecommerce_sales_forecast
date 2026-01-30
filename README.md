@@ -6,15 +6,47 @@
 
 ```
 ecommerce_sales_forecast/
+├── data/
+│   ├── sales_history.csv   # 销量历史数据 (34,858行)
+│   └── sku_metadata.csv    # SKU元数据 (100个SKU)
 ├── code_preprocess/
-│   └── preprocess.py      # 数据预处理与特征工程
+│   └── preprocess.py       # 数据预处理与特征工程
 ├── code_evaluate/
-│   └── evaluate.py        # 评估指标计算
-├── deploy_chronos.ipynb   # 实时端点部署与预测
-├── batch_inference.ipynb  # 多站点批量预测
-├── evaluate.ipynb         # 模型评估与可视化
+│   └── evaluate.py         # 评估指标计算
+├── generate_sample_data.py # 模拟数据生成器
+├── deploy_chronos.ipynb    # 实时端点部署与预测
+├── batch_inference.ipynb   # 多站点批量预测
+├── evaluate.ipynb          # 模型评估与可视化
 └── README.md
 ```
+
+## 数据说明
+
+### 模拟数据特征
+- 100个SKU，覆盖5个类目
+- 2年历史数据 (2024-01-01 ~ 2026-01-30)
+- 产品生命周期: 6-24个月
+- 每月有新品发布
+- 包含季节性、节假日、促销等影响因素
+
+### 数据字段
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| asin | str | Amazon 产品标识 |
+| sku | str | 内部SKU编号 |
+| date | datetime | 日期 |
+| sales_quantity | int | 销售数量 |
+| sale_price | float | 售价 |
+| original_price | float | 原价 |
+| discount_rate | float | 折扣率 |
+| ad_spend | float | 广告花费 |
+| ad_impressions | int | 广告曝光 |
+| ad_clicks | int | 广告点击 |
+| fba_inventory | int | FBA库存 |
+| is_lightning_deal | int | 秒杀活动 |
+| is_coupon_active | int | 优惠券 |
+| category | str | 产品类目 |
+| launch_date | datetime | 上架日期 |
 
 ## 核心特征
 
