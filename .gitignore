@@ -20,3 +20,4 @@ __pycache__/
 # 系统
 .DS_Store
 *.log
+data/sales_history_enriched.csv
