@@ -1,144 +1,144 @@
-# 跨境电商销量预测
+# E-commerce Sales Forecasting
 
-基于 Amazon Chronos-2 预训练时序模型的销量预测方案。
+Sales forecasting solution based on Amazon Chronos-2 pre-trained time series model.
 
-## 项目结构
+## Project Structure
 
 ```
 ecommerce_sales_forecast/
 ├── models/
-│   ├── chronos-2-small/          # 推荐：准确率最高 (92.2%)
-│   │   ├── predict.py            # 预测脚本
-│   │   ├── evaluate.py           # 评估脚本
-│   │   ├── finetune.py           # 微调脚本
+│   ├── chronos-2-small/          # Recommended: Highest accuracy (92.2%)
+│   │   ├── predict.py            # Prediction script
+│   │   ├── evaluate.py           # Evaluation script
+│   │   ├── finetune.py           # Fine-tuning script
 │   │   └── README.md
-│   └── chronos-t5-small/         # 支持微调
+│   └── chronos-t5-small/         # Supports fine-tuning
 │       ├── finetune_chronos.py
 │       ├── finetune_config.yaml
 │       ├── eval_finetuned.py
 │       └── README.md
 ├── data/
-│   ├── sales_history.csv         # 销量历史数据
-│   ├── sku_metadata.csv          # SKU元数据
-│   └── data_dictionary.md        # 数据字典
+│   ├── sales_history.csv         # Sales history data
+│   ├── sku_metadata.csv          # SKU metadata
+│   └── data_dictionary.md        # Data dictionary
 ├── src/
-│   ├── generate_sample_data.py   # 模拟数据生成
+│   ├── generate_sample_data.py   # Sample data generator
 │   ├── preprocess/
-│   │   ├── preprocess.py         # 数据预处理
-│   │   └── add_features.py       # 特征工程
+│   │   ├── preprocess.py         # Data preprocessing
+│   │   └── add_features.py       # Feature engineering
 │   └── evaluate/
-│       └── evaluate.py           # 评估工具
+│       └── evaluate.py           # Evaluation utilities
 ├── notebooks/
-│   ├── deploy_chronos.ipynb      # SageMaker部署
-│   ├── batch_inference.ipynb     # 批量推理
-│   └── evaluate.ipynb            # 评估可视化
+│   ├── deploy_chronos.ipynb      # SageMaker deployment
+│   ├── batch_inference.ipynb     # Batch inference
+│   └── evaluate.ipynb            # Evaluation visualization
 ├── tests/
-│   └── test_covariate_impact.py  # 协变量测试
+│   └── test_covariate_impact.py  # Covariate impact testing
 └── README.md
 ```
 
-## 模型对比
+## Model Comparison
 
-60天销量预测准确率 (100个SKU回测):
+60-day sales forecast accuracy (100 SKUs backtesting):
 
-| 模型 | 参数量 | 准确率 | WAPE | 推荐场景 |
-|------|--------|--------|------|----------|
-| **chronos-2-small** | 28M | **92.2%** | 7.8% | ⭐ 生产环境首选 |
-| chronos-t5-small (微调) | 46M | 82.9% | 17.1% | 需要定制化 |
-| chronos-t5-small (预训练) | 46M | 55.7% | 44.3% | 快速验证 |
-| chronos-bolt-small | 48M | 70.7% | 29.3% | 追求速度 |
+| Model | Parameters | Accuracy | WAPE | Recommended Use |
+|-------|------------|----------|------|-----------------|
+| **chronos-2-small** | 28M | **92.2%** | 7.8% | ⭐ Production |
+| chronos-t5-small (fine-tuned) | 46M | 82.9% | 17.1% | Customization needed |
+| chronos-t5-small (pretrained) | 46M | 55.7% | 44.3% | Quick validation |
+| chronos-bolt-small | 48M | 70.7% | 29.3% | Speed priority |
 
-## 协变量测试结论
+## Covariate Testing Conclusions
 
-### 老品 vs 新品预测策略
+### Mature vs New Product Forecasting Strategy
 
-| 场景 | 仅销量 | 销量+大促 | 建议 |
-|------|--------|-----------|------|
-| **老品** (历史≥60天) | 92.0% | 92.1% | 加大促字段 |
-| **新品** (历史<60天) | 48.0% | 51.1% | 加大促字段 |
+| Scenario | Sales Only | Sales + Major Sale | Recommendation |
+|----------|------------|-------------------|----------------|
+| **Mature Products** (history ≥60 days) | 92.0% | 92.1% | Add major sale field |
+| **New Products** (history <60 days) | 48.0% | 51.1% | Add major sale field |
 
-### 关键发现
+### Key Findings
 
-1. **预训练模型最优**：微调会降低准确率，无论老品还是新品
-2. **协变量越少越好**：添加过多特征会引入噪声
-3. **新品场景例外**：历史数据不足时，`is_major_sale_event` 可提升 +3.1%
-4. **统一方案**：`销量 + is_major_sale_event` 适用于所有场景
+1. **Pretrained model is optimal**: Fine-tuning reduces accuracy for both mature and new products
+2. **Fewer covariates is better**: Adding too many features introduces noise
+3. **New product exception**: With insufficient history, `is_major_sale_event` improves accuracy by +3.1%
+4. **Unified approach**: `Sales + is_major_sale_event` works for all scenarios
 
-### 协变量详细测试 (老品)
+### Detailed Covariate Testing (Mature Products)
 
-| 配置 | 准确率 |
-|------|--------|
-| 无协变量 | 92.0% |
+| Configuration | Accuracy |
+|---------------|----------|
+| No covariates | 92.0% |
 | is_major_sale_event | **92.1%** |
-| 6个促销字段 | 81.9% |
-| 全部18个协变量 | 81.1% |
+| 6 promotion fields | 81.9% |
+| All 18 covariates | 81.1% |
 
-## 快速开始
+## Quick Start
 
-### 环境准备
+### Environment Setup
 
 ```bash
 pip install chronos-forecasting>=2.1.0 torch pandas numpy
 ```
 
-### 使用Chronos-2-Small预测 (推荐)
+### Using Chronos-2-Small (Recommended)
 
 ```bash
 cd models/chronos-2-small
 
-# 批量预测
+# Batch prediction
 python predict.py --data ../../data/sales_history.csv --output forecast.csv --days 60
 
-# 模型评估
+# Model evaluation
 python evaluate.py --data ../../data/sales_history.csv --cutoff 2025-11-30
 ```
 
-## 数据格式
+## Data Format
 
-### 输入数据 (sales_history.csv)
+### Input Data (sales_history.csv)
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| sku | str | ✅ | SKU编号 |
-| date | datetime | ✅ | 日期 |
-| sales_quantity | int | ✅ | 销售数量 |
-| marketplace | str | ✅ | 站点 (US/UK/DE等) |
-| is_major_sale_event | int | 建议 | 大促标记 (新品场景) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| sku | str | ✅ | SKU identifier |
+| date | datetime | ✅ | Date |
+| sales_quantity | int | ✅ | Sales quantity |
+| marketplace | str | ✅ | Marketplace (US/UK/DE etc.) |
+| is_major_sale_event | int | Recommended | Major sale flag (for new products) |
 
-### 输出数据
+### Output Data
 
-| 字段 | 说明 |
-|------|------|
-| sku | SKU编号 |
-| date | 预测日期 |
-| predicted_median | 中位数预测 |
-| predicted_p10 | 10%分位数 (悲观) |
-| predicted_p90 | 90%分位数 (乐观) |
+| Field | Description |
+|-------|-------------|
+| sku | SKU identifier |
+| date | Forecast date |
+| predicted_median | Median prediction |
+| predicted_p10 | 10th percentile (pessimistic) |
+| predicted_p90 | 90th percentile (optimistic) |
 
-## 评估指标
+## Evaluation Metrics
 
-| 指标 | 说明 | 建议阈值 |
-|------|------|----------|
-| WAPE | 加权绝对百分比误差 | <15% 优秀 |
-| Accuracy | 准确率 (100-WAPE) | >85% 良好 |
-| Bias | 预测偏差 | 接近0 |
+| Metric | Description | Target |
+|--------|-------------|--------|
+| WAPE | Weighted Absolute Percentage Error | <15% Excellent |
+| Accuracy | Accuracy (100-WAPE) | >85% Good |
+| Bias | Forecast bias | Close to 0 |
 
-## 部署建议
+## Deployment Recommendations
 
-### EC2实例选择
+### EC2 Instance Selection
 
-| 场景 | 实例类型 | 说明 |
-|------|----------|------|
-| 开发测试 | g5.xlarge | 24GB显存 |
-| 生产环境 | g5.2xlarge | 批量预测 |
-| 大规模 | g6e.xlarge | L40S GPU |
+| Use Case | Instance Type | Notes |
+|----------|---------------|-------|
+| Development | g5.xlarge | 24GB VRAM |
+| Production | g5.2xlarge | Batch prediction |
+| Large scale | g6e.xlarge | L40S GPU |
 
-### SageMaker部署
+### SageMaker Deployment
 
-参考 `notebooks/deploy_chronos.ipynb` 进行端点部署。
+See `notebooks/deploy_chronos.ipynb` for endpoint deployment.
 
-## 参考资料
+## References
 
-- [Chronos-2 论文](https://arxiv.org/abs/2510.15821)
-- [Chronos 论文](https://arxiv.org/abs/2403.07815)
-- [GitHub 仓库](https://github.com/amazon-science/chronos-forecasting)
+- [Chronos-2 Paper](https://arxiv.org/abs/2510.15821)
+- [Chronos Paper](https://arxiv.org/abs/2403.07815)
+- [GitHub Repository](https://github.com/amazon-science/chronos-forecasting)
